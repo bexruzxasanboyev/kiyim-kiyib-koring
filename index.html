@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Kiyimni kiyib ko'ring</title>
+<style>
+:root{--bg:#0b0d10;--card:#14181e;--line:#232b35;--tx:#e8eef6;--mut:#8d9bab;--acc:#5eead4;--bad:#f87171;--warn:#fbbf24}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+body{min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:18px 14px calc(26px + env(safe-area-inset-bottom))}
+.wrap{width:100%;max-width:480px}
+h1{font-size:22px;margin:4px 0 4px;letter-spacing:-.02em}
+.sub{color:var(--mut);font-size:14px;margin-bottom:14px}
+.stage{position:relative;width:100%;aspect-ratio:4/3;background:#000;border-radius:20px;overflow:hidden;border:1px solid var(--line)}
+video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
+#out{display:none}
+#cam{transform:scaleX(-1)}
+.badge{position:absolute;left:12px;top:12px;font-size:12px;font-weight:700;padding:5px 10px;border-radius:999px;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);color:#fff}
+.badge.live{background:rgba(94,234,212,.92);color:#04201c}
+.overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;text-align:center;background:linear-gradient(180deg,rgba(11,13,16,.55),rgba(11,13,16,.85))}
+.overlay p{margin:0;color:#cdd7e3;font-size:14.5px;max-width:300px}
+.btn{appearance:none;border:0;border-radius:14px;padding:13px 22px;font-size:16px;font-weight:700;background:var(--acc);color:#04201c;cursor:pointer;min-height:48px}
+.btn.ghost{background:transparent;color:var(--acc);border:1px solid #2b4b46}
+.btn:disabled{opacity:.5}
+.status{min-height:22px;margin:10px 2px 2px;font-size:13.5px;color:var(--mut)}
+.status.err{color:var(--bad)}.status.warn{color:var(--warn)}
+h2{font-size:14px;margin:14px 2px 8px;color:var(--mut);text-transform:uppercase;letter-spacing:.06em}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.item{aspect-ratio:1;border-radius:14px;overflow:hidden;border:2px solid var(--line);background:#fff;cursor:pointer;padding:0;position:relative}
+.item img{width:100%;height:100%;object-fit:cover;display:block}
+.item.sel{border-color:var(--acc);box-shadow:0 0 0 2px rgba(94,234,212,.25)}
+.item.up{background:#1a2028;color:var(--acc);display:grid;place-items:center;font-size:12px;font-weight:700;text-align:center;line-height:1.2}
+.row{display:flex;gap:8px;margin-top:12px}
+.row .btn{flex:1}
+.tip{margin-top:14px;padding:11px 13px;border-left:3px solid var(--warn);background:#1b170e;border-radius:10px;font-size:13px;color:#e6d9b8}
+.foot{margin-top:18px;color:var(--mut);font-size:12px;text-align:center}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Kiyimni kiyib ko'ring</h1>
+  <div class="sub">Kamerani yoqing, kiyimni tanlang. U sizning ustingizda jonli ko'rinadi.</div>
+
+  <div class="stage">
+    <video id="cam" autoplay muted playsinline></video>
+    <video id="out" autoplay muted playsinline></video>
+    <span class="badge" id="badge">Kamera o'chiq</span>
+    <div class="overlay" id="start">
+      <p id="startText">Kamera faqat sizning qurilmangizda ishlaydi. Boshlash uchun ruxsat bering.</p>
+      <button class="btn" id="btnStart">Kamerani yoqish</button>
+    </div>
+  </div>
+
+  <div class="status" id="status"></div>
+
+  <h2>Kiyim tanlang</h2>
+  <div class="grid" id="grid">
+    <button class="item" data-img="/garments/hoodie.jpg" data-p="Substitute the current top with a navy blue zip-up hoodie with a relaxed fit"><img src="/garments/hoodie.jpg" alt="Hudi"></button>
+    <button class="item" data-img="/garments/sweater.jpg" data-p="Substitute the current top with a burgundy cable-knit crewneck sweater"><img src="/garments/sweater.jpg" alt="Sviter"></button>
+    <button class="item" data-img="/garments/shirt.jpg" data-p="Substitute the current top with a light blue button-up oxford shirt"><img src="/garments/shirt.jpg" alt="Ko'ylak"></button>
+    <button class="item" data-img="/garments/coat.jpg" data-p="Substitute the current top with a tan brown double-breasted wool coat"><img src="/garments/coat.jpg" alt="Palto"></button>
+    <label class="item up" id="upLabel">O'zingiz<br>yuklang<input type="file" id="file" accept="image/jpeg,image/png,image/webp" hidden></label>
+  </div>
+
+  <div class="row">
+    <button class="btn ghost" id="btnOrig" disabled>Asl holat</button>
+    <button class="btn ghost" id="btnStop" disabled>To'xtatish</button>
+  </div>
+
+  <div class="tip">Eng yaxshi natija uchun: yorug' joy, bo'yingizdan belgacha ko'rinib tursin, qalin kurtka yoki palto kiymagan bo'ling.</div>
+  <div class="foot">Video sizning qurilmangizdan faqat jonli kiydirish uchun yuboriladi va saqlanmaydi.</div>
+</div>
+
+<script type="module">
+import { createDecartClient, models } from "https://esm.sh/@decartai/sdk@0.2.14";
+
+const $ = (id) => document.getElementById(id);
+const cam = $("cam"), out = $("out"), badge = $("badge"), statusEl = $("status");
+let stream = null, rt = null, client = null, selected = null, connecting = false;
+
+const setStatus = (t, cls = "") => { statusEl.textContent = t || ""; statusEl.className = "status " + cls; };
+const setBadge = (t, live = false) => { badge.textContent = t; badge.classList.toggle("live", live); };
+
+async function getToken() {
+  const r = await fetch("https://kiyim-token.vercel.app/api/token", { method: "POST" });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) { const e = new Error(j.message || j.error || "token xatosi"); e.code = j.error; throw e; }
+  return j.apiKey;
+}
+
+async function startCamera() {
+  const model = models.realtime("lucy-vton-latest");
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: { facingMode: "user", frameRate: model.fps, width: model.width, height: model.height },
+    });
+  } catch (e) {
+    $("startText").textContent = "Kameraga ruxsat berilmadi. Brauzer sozlamalaridan ruxsat bering va qayta urining.";
+    setStatus("Kamera ochilmadi: " + (e.name || "xato"), "err");
+    return null;
+  }
+  cam.srcObject = stream;
+  $("start").classList.add("hidden");
+  setBadge("Kamera yoqiq");
+  $("btnStop").disabled = false;
+  setStatus("Kamera tayyor. Endi kiyim tanlang.");
+  return model;
+}
+
+async function connect(model) {
+  if (rt || connecting) return;
+  connecting = true;
+  setStatus("Ulanmoqda…");
+  try {
+    client = createDecartClient({ apiKeyProvider: getToken });
+    rt = await client.realtime.connect(stream, {
+      model, mirror: "auto",
+      onRemoteStream: (s) => {
+        out.srcObject = s; out.style.display = "block"; cam.style.display = "none";
+        setBadge("Jonli natija", true); setStatus("");
+      },
+      onError: (e) => setStatus("Xato: " + (e?.message || e), "err"),
+      onDisconnect: () => { setBadge("Uzildi"); setStatus("Aloqa uzildi. Qayta tanlang.", "warn"); rt = null; out.style.display = "none"; cam.style.display = "block"; },
+    });
+  } catch (e) {
+    rt = null;
+    if (e.code === "no_key") setStatus("Server hali sozlanmagan: Decart API kaliti kiritilmagan.", "err");
+    else if (e.code === "token_failed") setStatus("Server token bermadi. Birozdan keyin qayta urining.", "err");
+    else setStatus("Ulanib bo'lmadi: " + (e.message || e), "err");
+  } finally { connecting = false; }
+}
+
+async function applyGarment(prompt, imageBlobOrUrl) {
+  if (!stream) { const m = await startCamera(); if (!m) return; await connect(m); }
+  else if (!rt) await connect(models.realtime("lucy-vton-latest"));
+  if (!rt) return;
+  setStatus("Kiyim kiydirilmoqda…");
+  const state = { prompt, enhance: false };
+  if (imageBlobOrUrl) state.image = imageBlobOrUrl;
+  try { await rt.set(state); $("btnOrig").disabled = false; setStatus(""); }
+  catch (e) { setStatus("Kiydirib bo'lmadi: " + (e.message || e), "err"); }
+}
+
+$("btnStart").onclick = async () => { const m = await startCamera(); if (m) await connect(m); };
+
+document.querySelectorAll(".item[data-img]").forEach((el) => {
+  el.onclick = async () => {
+    document.querySelectorAll(".item").forEach((x) => x.classList.remove("sel"));
+    el.classList.add("sel");
+    const blob = await (await fetch(el.dataset.img)).blob();
+    selected = el;
+    await applyGarment(el.dataset.p, blob);
+  };
+});
+
+$("file").onchange = async (e) => {
+  const f = e.target.files?.[0]; if (!f) return;
+  document.querySelectorAll(".item").forEach((x) => x.classList.remove("sel"));
+  $("upLabel").classList.add("sel");
+  await applyGarment("Substitute the current top with the garment shown in the reference image", f);
+};
+
+$("btnOrig").onclick = async () => {
+  if (!rt) return;
+  try { await rt.set({ prompt: "", enhance: false }); } catch {}
+  out.style.display = "none"; cam.style.display = "block";
+  document.querySelectorAll(".item").forEach((x) => x.classList.remove("sel"));
+  setBadge("Asl holat"); setStatus("Kiyim tanlasangiz, yana kiydiriladi.");
+};
+
+$("btnStop").onclick = () => {
+  try { rt?.disconnect(); } catch {}
+  rt = null; stream?.getTracks().forEach((t) => t.stop()); stream = null;
+  cam.srcObject = null; out.srcObject = null; out.style.display = "none"; cam.style.display = "block";
+  $("start").classList.remove("hidden"); $("startText").textContent = "Qayta boshlash uchun kamerani yoqing.";
+  setBadge("Kamera o'chiq"); $("btnStop").disabled = true; $("btnOrig").disabled = true; setStatus("");
+};
+</script>
+</body>
+</html>
