@@ -133,15 +133,31 @@ async function connect(model) {
   } finally { connecting = false; }
 }
 
-async function applyGarment(prompt, imageBlobOrUrl) {
+async function applyGarment(prompt, imageBlobOrUrl, urlFallback) {
   if (!stream) { const m = await startCamera(); if (!m) return; await connect(m); }
   else if (!rt) await connect(models.realtime("lucy-vton-latest"));
   if (!rt) return;
   setStatus("Kiyim kiydirilmoqda…");
   const state = { prompt, enhance: false };
   if (imageBlobOrUrl) state.image = imageBlobOrUrl;
-  try { await rt.set(state); $("btnOrig").disabled = false; setStatus(""); }
-  catch (e) { setStatus("Kiydirib bo'lmadi: " + (e.message || e), "err"); }
+  try {
+    await rt.set(state);
+    $("btnOrig").disabled = false;
+    setStatus("");
+  } catch (e) {
+    const msg = String(e?.message || e);
+    // Zaxira: fayl o'rniga rasm URL'i bilan urinish (ba'zi brauzerlarda File turi tanilmaydi)
+    const fb = urlFallback || (typeof imageBlobOrUrl === "string" ? imageBlobOrUrl : null);
+    if (/file type|invalid|unsupported/i.test(msg) && fb) {
+      try {
+        await rt.set({ prompt, enhance: false, image: new URL(fb, location.href).href });
+        $("btnOrig").disabled = false;
+        setStatus("");
+        return;
+      } catch (e2) { setStatus("Kiydirib bo'lmadi: " + String(e2?.message || e2), "err"); return; }
+    }
+    setStatus("Kiydirib bo'lmadi: " + msg, "err");
+  }
 }
 
 $("btnStart").onclick = async () => { const m = await startCamera(); if (m) await connect(m); };
@@ -155,7 +171,7 @@ document.querySelectorAll(".item[data-img]").forEach((el) => {
     const blob = await res.blob();
     const file = new File([blob], el.dataset.img.split("/").pop(), { type: blob.type || "image/jpeg" });
     selected = el;
-    await applyGarment(el.dataset.p, file);
+    await applyGarment(el.dataset.p, file, el.dataset.img);
   };
 });
 
